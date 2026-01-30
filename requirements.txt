@@ -1,0 +1,39 @@
+
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+python-dotenv
+transformers
+torch
+accelerate
+bitsandbytes
+sentencepiece
+langchain
+langchain-community
+langchain-core
+httpx
+requests
+tenacity
+redis
+aioredis
+
+# ---- Intelligence Extraction ----
+phonenumbers
+validators
+rapidfuzz
+
+# ---- Utils ----
+jinja2
+orjson
+loguru
+rich
+
+# ---- Testing ----
+pytest
+pytest-asyncio
+
+# ---- Dev Tools ----
+black
+ruff
+isort
