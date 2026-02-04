@@ -1,5 +1,5 @@
 from langchain_core.output_parsers import StrOutputParser
-from app.llm.gemini_llm import get_gemini
+from app.llm.providers.gemini_llm import get_gemini
 from prompts.base_prompt import BASE_PROMPT
 
 

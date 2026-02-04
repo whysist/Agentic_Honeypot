@@ -3,8 +3,8 @@ from langchain_core.exceptions import OutputParserException
 
 from llm.schemas.threat_schema import ThreatAnalysis
 from llm.prompts.base_prompt import BASE_PROMPT
-from llm.gemini_llm import gemini_flash
-from llm.groq_llm import groq_llm
+from app.llm.providers.gemini_llm import gemini_flash
+from app.llm.providers.groq_llm import groq_llm
 
 
 class LLMRouter:

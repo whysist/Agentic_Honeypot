@@ -1,3 +1,5 @@
 venv/
 app/core/__pycache__
 app/storage/__pycache__
+.env
+config.py
