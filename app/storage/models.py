@@ -1,17 +1,27 @@
-from pydantic import BaseModel,Field
-from typing import List, Optional, Literal,Union
+from pydantic import BaseModel, Field, field_validator
+from typing import List, Optional, Literal, Union
 from datetime import datetime
 
 class Message(BaseModel):
-    sender:Literal["scammer","user"]
-    text:str
-    timestamp: Union[int, datetime]
+    sender: str
+    text: str
+    timestamp: Union[int, datetime, str]
+
+    @field_validator("sender")
+    @classmethod
+    def normalize_sender(cls, v):
+        v = v.lower()
+        if v not in {"scammer", "user"}:
+            raise ValueError("Invalid sender")
+        return v
+
 
 class HoneypotRequest(BaseModel):
-    sessionId:str
-    message:Message
+    sessionId: str
+    message: Message
     conversationHistory: List[Message] = Field(default_factory=list)
-    metadata:Optional[dict]=None
+    metadata: Optional[dict] = None
+
 
 class HoneypotResponse(BaseModel):
     sessionId: str
@@ -20,21 +30,19 @@ class HoneypotResponse(BaseModel):
 
 
 class ExtractedIntelligence(BaseModel):
-    bankAccounts:List[str]=[]
-    upiIds:List[str]=[]
-    phishingLinks:List[str]=[]
-    phoneNumbers:List[str]=[]
-    suspiciousKeywords:List[str]=[]
+    bankAccounts: List[str] = Field(default_factory=list)
+    upiIds: List[str] = Field(default_factory=list)
+    phishingLinks: List[str] = Field(default_factory=list)
+    phoneNumbers: List[str] = Field(default_factory=list)
+    suspiciousKeywords: List[str] = Field(default_factory=list)
+
 
 class SessionState(BaseModel):
-    sessionId:str
-    scamDetected:bool=False
-    totalMessagesExchanged:int=0
+    sessionId: str
+    scamDetected: bool = False
+    totalMessagesExchanged: int = 0
     extractedIntelligence: ExtractedIntelligence = Field(
         default_factory=ExtractedIntelligence
     )
     agentNotes: Optional[str] = None
     callbackSent: bool = False
-
-
-    
