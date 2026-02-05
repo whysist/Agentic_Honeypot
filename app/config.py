@@ -4,7 +4,7 @@ Configuration for Agentic Honeypot API
 import os
 
 # API Configuration
-HONEYPOT_API_KEY = os.getenv("HONEYPOT_API_KEY")
+API_KEY = os.getenv("HONEYPOT_API_KEY")
 GUVI_CALLBACK_URL = os.getenv("GUVI_CALLBACK_URL", "https://guvi-hackathon.co/api/callback")
 
 # HuggingFace Configuration
