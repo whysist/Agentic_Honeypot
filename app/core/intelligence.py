@@ -16,16 +16,16 @@ class IntelligenceExtractor:
 
         intelligence = ExtractedIntelligence()
 
-        # Bank account numbers & IFSC codes
-        bank_patterns = [
-            r"\b\d{9,18}\b",              # account numbers
-            r"\b[a-z]{4}0[a-z0-9]{6}\b",  # IFSC codes
-        ]
+        # IFSC codes (specific format: 4 letters + 0 + 6 alphanumeric)
+        ifsc_pattern = r"\b[a-z]{4}0[a-z0-9]{6}\b"
+        intelligence.bankAccounts.extend(re.findall(ifsc_pattern, all_text))
 
-        for pattern in bank_patterns:
-            intelligence.bankAccounts.extend(re.findall(pattern, all_text))
+        # Bank account numbers: require a context word nearby
+        # Matches 9-18 digit sequences preceded by account-related words
+        account_pattern = r"(?:account|a/c|acct|acc)\s*(?:no\.?|number|num|#)?\s*:?\s*(\d{9,18})"
+        intelligence.bankAccounts.extend(re.findall(account_pattern, all_text))
 
-        # UPI IDs
+        # UPI IDs (email-like patterns filtered by known UPI providers)
         upi_pattern = r"\b[\w\.-]+@[\w\.-]+\b"
         upi_matches = re.findall(upi_pattern, all_text)
 
@@ -50,8 +50,8 @@ class IntelligenceExtractor:
         )
         intelligence.phishingLinks.extend(re.findall(link_pattern, all_text))
 
-        # Phone numbers
-        phone_pattern = r"\+?[0-9]{10,13}"
+        # Phone numbers: require word boundary, 10-13 digits with optional +
+        phone_pattern = r"(?<!\d)\+?\d{10,13}(?!\d)"
         intelligence.phoneNumbers.extend(re.findall(phone_pattern, all_text))
 
         # Suspicious keywords
@@ -72,7 +72,7 @@ class IntelligenceExtractor:
             if kw in all_text:
                 intelligence.suspiciousKeywords.append(kw)
 
-        # Deduplicate everything       
+        # Deduplicate everything
         intelligence.bankAccounts = list(set(intelligence.bankAccounts))
         intelligence.upiIds = list(set(intelligence.upiIds))
         intelligence.phishingLinks = list(set(intelligence.phishingLinks))

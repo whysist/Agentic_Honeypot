@@ -1,6 +1,8 @@
 from pydantic import BaseModel, Field, field_validator
 from typing import List, Optional, Literal, Union
 from datetime import datetime
+import time
+
 
 class Message(BaseModel):
     sender: str
@@ -11,7 +13,7 @@ class Message(BaseModel):
     @classmethod
     def normalize_sender(cls, v):
         v = v.lower()
-        if v not in {"scammer", "user"}:
+        if v not in {"scammer", "user", "agent"}:
             raise ValueError("Invalid sender")
         return v
 
@@ -40,9 +42,13 @@ class ExtractedIntelligence(BaseModel):
 class SessionState(BaseModel):
     sessionId: str
     scamDetected: bool = False
+    scamCategories: List[str] = Field(default_factory=list)
+    persona: Optional[str] = None
     totalMessagesExchanged: int = 0
+    conversationHistory: List[Message] = Field(default_factory=list)
     extractedIntelligence: ExtractedIntelligence = Field(
         default_factory=ExtractedIntelligence
     )
     agentNotes: Optional[str] = None
     callbackSent: bool = False
+    createdAt: float = Field(default_factory=time.time)
