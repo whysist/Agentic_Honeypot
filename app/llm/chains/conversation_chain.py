@@ -1,3 +1,4 @@
+import logging
 import random
 import re
 from typing import Dict, List
@@ -5,6 +6,8 @@ from typing import Dict, List
 from app.core.persona import PersonaManager
 from app.llm.prompts.honeypot_prompt import HONEYPOT_PROMPT
 from app.llm.providers.hugging_face import generate_text
+
+logger = logging.getLogger(__name__)
 
 
 class ConversationAgent:
@@ -21,15 +24,15 @@ class ConversationAgent:
     def __init__(self):
         self.fallback_responses = {
             "bank_fraud": [
-                "Oh no, I didn’t realize my account could be blocked.",
-                "I’m not very good with banking apps, can you explain?",
+                "Oh no, I didn't realize my account could be blocked.",
+                "I'm not very good with banking apps, can you explain?",
             ],
             "upi_fraud": [
-                "I don’t really understand UPI very well.",
+                "I don't really understand UPI very well.",
                 "That sounds confusing, what do I need to do?",
             ],
             "phishing": [
-                "I’m not sure about clicking links, is it safe?",
+                "I'm not sure about clicking links, is it safe?",
                 "Why do I need to reset my password?",
             ],
             "fake_lottery": [
@@ -37,7 +40,7 @@ class ConversationAgent:
                 "That sounds exciting! What should I do next?",
             ],
             "general": [
-                "I’m not sure I understand, can you explain again?",
+                "I'm not sure I understand, can you explain again?",
                 "This is a bit confusing for me.",
             ],
         }
@@ -45,28 +48,28 @@ class ConversationAgent:
         # Used only for agent turns 1–2
         self.early_naive_responses = {
             "bank_fraud": [
-                "Oh… I didn’t know that could happen.",
-                "I see, I’m not very familiar with bank procedures.",
+                "Oh… I didn't know that could happen.",
+                "I see, I'm not very familiar with bank procedures.",
             ],
             "upi_fraud": [
-                "I’m not very good with UPI things.",
+                "I'm not very good with UPI things.",
                 "Okay, that sounds a bit confusing.",
             ],
             "phishing": [
-                "Oh, I wasn’t expecting that.",
+                "Oh, I wasn't expecting that.",
                 "Let me try to understand this.",
             ],
             "fake_lottery": [
                 "Oh wow, really?",
-                "That’s surprising, I didn’t expect that.",
+                "That's surprising, I didn't expect that.",
             ],
             "impersonation": [
                 "That sounds serious… what should I do?",
-                "Okay, I’m listening.",
+                "Okay, I'm listening.",
             ],
             "general": [
                 "Oh, okay.",
-                "Hmm, I’m not really sure.",
+                "Hmm, I'm not really sure.",
             ],
         }
 
@@ -84,7 +87,7 @@ class ConversationAgent:
         persona_key = session_data.get("persona", "confused_elderly")
 
         agent_turns = sum(
-            1 for msg in conversation_history if msg.get("sender") == "user"
+            1 for msg in conversation_history if msg.get("sender") == "agent"
         )
 
         # Early naive replies (turns 1–2)
@@ -106,8 +109,8 @@ class ConversationAgent:
             if cleaned and len(cleaned) > 8:
                 return cleaned
 
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("LLM call failed, using fallback: %s", e)
 
         return self._fallback_reply(scam_categories)
 
@@ -125,7 +128,8 @@ class ConversationAgent:
 
         conversation = ""
         for msg in conversation_history[-6:]:
-            role = "Scammer" if msg["sender"] == "scammer" else "You"
+            sender = msg.get("sender", "scammer")
+            role = "Scammer" if sender == "scammer" else "You"
             conversation += f"{role}: {msg['text']}\n"
 
         return HONEYPOT_PROMPT.format(

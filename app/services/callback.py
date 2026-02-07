@@ -12,9 +12,10 @@ TIMEOUT_SECONDS = 10
 def send_final_result(
     session: SessionState,
     intelligence: ExtractedIntelligence,
-) -> None:
+) -> bool:
     """
     Send extracted intelligence to external callback endpoint.
+    Returns True on success, False on failure.
     Fires at most once per session (caller enforces this).
     """
 
@@ -35,12 +36,18 @@ def send_final_result(
 
         if response.status_code == 200:
             logger.info(
-                f"Callback sent successfully for session {session.sessionId}"
+                "Callback sent successfully for session %s",
+                session.sessionId,
             )
+            return True
         else:
             logger.error(
-                f"Callback failed ({response.status_code}): {response.text}"
+                "Callback failed (%s): %s",
+                response.status_code,
+                response.text,
             )
+            return False
 
     except requests.RequestException as e:
-        logger.error(f"Callback request error: {e}")
+        logger.error("Callback request error: %s", e)
+        return False

@@ -9,7 +9,7 @@ from app.config import (
 
 logger = logging.getLogger(__name__)
 
-HF_API_URL = f" https://router.huggingface.co/models/{HF_MODEL}"
+HF_API_URL = f"https://router.huggingface.co/models/{HF_MODEL}"
 
 DEFAULT_TIMEOUT = 8  # seconds
 
