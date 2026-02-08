@@ -2,10 +2,6 @@ from typing import List
 
 
 class PersonaManager:
-    """
-    Selects and describes personas used by the honeypot agent.
-    This module contains ZERO LLM or API logic.
-    """
 
     PERSONAS = {
         "confused_elderly": {
@@ -48,31 +44,14 @@ class PersonaManager:
 
     @classmethod
     def select_persona(cls, scam_categories: List[str]) -> str:
-        """
-        Choose the most effective persona based on detected scam categories.
-        Returns the persona key.
-        """
-
         if "fake_lottery" in scam_categories:
             return "naive_student"
-
         if "impersonation" in scam_categories:
             return "worried_parent"
-
         if "bank_fraud" in scam_categories or "upi_fraud" in scam_categories:
             return "confused_elderly"
-
-        # Default fallback
         return "cautious_professional"
 
     @classmethod
     def get_persona_prompt_data(cls, persona_key: str) -> dict:
-        """
-        Returns persona description + traits for prompt construction.
-        Safe fallback if an unknown key is provided.
-        """
-
-        return cls.PERSONAS.get(
-            persona_key,
-            cls.PERSONAS["confused_elderly"],
-        )
+        return cls.PERSONAS.get(persona_key, cls.PERSONAS["confused_elderly"])

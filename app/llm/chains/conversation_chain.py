@@ -5,21 +5,17 @@ from typing import Dict, List
 
 from app.core.persona import PersonaManager
 from app.llm.prompts.honeypot_prompt import HONEYPOT_PROMPT
-from app.llm.providers.hugging_face import generate_text
+from app.llm.providers import gemini_llm, hugging_face
 
 logger = logging.getLogger(__name__)
 
+PROVIDERS = [
+    ("Gemini", gemini_llm.generate_text),
+    ("HuggingFace", hugging_face.generate_text),
+]
+
 
 class ConversationAgent:
-    """
-    Handles multi-turn conversation logic with scammers.
-    Responsible for:
-    - early naive replies
-    - prompt construction
-    - LLM invocation
-    - response cleaning
-    - fallback logic
-    """
 
     def __init__(self):
         self.fallback_responses = {
@@ -45,7 +41,6 @@ class ConversationAgent:
             ],
         }
 
-        # Used only for agent turns 1–2
         self.early_naive_responses = {
             "bank_fraud": [
                 "Oh… I didn't know that could happen.",
@@ -73,15 +68,7 @@ class ConversationAgent:
             ],
         }
 
-    # ─────────────────────────────────────────────
-    # Public API
-    # ─────────────────────────────────────────────
-
     def generate_response(self, session_data: Dict) -> str:
-        """
-        Main entry point used by the API layer.
-        """
-
         conversation_history = session_data.get("conversationHistory", [])
         scam_categories = session_data.get("scamCategories", [])
         persona_key = session_data.get("persona", "confused_elderly")
@@ -90,33 +77,22 @@ class ConversationAgent:
             1 for msg in conversation_history if msg.get("sender") == "agent"
         )
 
-        # Early naive replies (turns 1–2)
         if agent_turns < 2:
             return self._early_naive_reply(scam_categories)
 
-        # Build prompt
-        prompt = self._build_prompt(
-            conversation_history,
-            scam_categories,
-            persona_key,
-        )
+        prompt = self._build_prompt(conversation_history, scam_categories, persona_key)
 
-        # Call LLM provider
-        try:
-            raw_response = generate_text(prompt)
-            cleaned = self._clean_response(raw_response)
-
-            if cleaned and len(cleaned) > 8:
-                return cleaned
-
-        except Exception as e:
-            logger.warning("LLM call failed, using fallback: %s", e)
+        for provider_name, provider_fn in PROVIDERS:
+            try:
+                raw = provider_fn(prompt)
+                cleaned = self._clean_response(raw)
+                if cleaned and len(cleaned) > 8:
+                    logger.info("Reply generated via %s", provider_name)
+                    return cleaned
+            except Exception as e:
+                logger.warning("%s failed: %s", provider_name, e)
 
         return self._fallback_reply(scam_categories)
-
-    # ─────────────────────────────────────────────
-    # Prompt construction
-    # ─────────────────────────────────────────────
 
     def _build_prompt(
         self,
@@ -128,8 +104,7 @@ class ConversationAgent:
 
         conversation = ""
         for msg in conversation_history[-6:]:
-            sender = msg.get("sender", "scammer")
-            role = "Scammer" if sender == "scammer" else "You"
+            role = "Scammer" if msg.get("sender") == "scammer" else "You"
             conversation += f"{role}: {msg['text']}\n"
 
         return HONEYPOT_PROMPT.format(
@@ -138,10 +113,6 @@ class ConversationAgent:
             scam_categories=", ".join(scam_categories) or "unknown",
             conversation=conversation.strip(),
         )
-
-    # ─────────────────────────────────────────────
-    # Response handling
-    # ─────────────────────────────────────────────
 
     def _clean_response(self, text: str) -> str:
         text = re.sub(r"^(you:|response:|assistant:)", "", text, flags=re.I)

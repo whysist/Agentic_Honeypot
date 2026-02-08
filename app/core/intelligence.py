@@ -5,74 +5,60 @@ from app.storage.models import Message, ExtractedIntelligence
 
 
 class IntelligenceExtractor:
-    """
-    Extract Indicators of Compromise (IOCs) from conversation history.
-    Stateless, regex-based, cheap to run every turn.
-    """
 
-    @staticmethod
-    def extract(conversation_history: List[Message]) -> ExtractedIntelligence:
+    SUSPICIOUS_KEYWORDS = [
+        "urgent", "verify", "immediately", "block", "suspend",
+        "otp", "cvv", "pin", "password", "account number",
+    ]
+
+    VALID_UPI_PROVIDERS = (
+        "paytm", "okaxis", "ybl", "axisbank", "oksbi", "sbi", "upi",
+    )
+
+    @classmethod
+    def extract(cls, conversation_history: List[Message]) -> ExtractedIntelligence:
         all_text = " ".join(msg.text for msg in conversation_history).lower()
-
         intelligence = ExtractedIntelligence()
 
-        # IFSC codes (specific format: 4 letters + 0 + 6 alphanumeric)
-        ifsc_pattern = r"\b[a-z]{4}0[a-z0-9]{6}\b"
-        intelligence.bankAccounts.extend(re.findall(ifsc_pattern, all_text))
-
-        # Bank account numbers: require a context word nearby
-        # Matches 9-18 digit sequences preceded by account-related words
-        account_pattern = r"(?:account|a/c|acct|acc)\s*(?:no\.?|number|num|#)?\s*:?\s*(\d{9,18})"
-        intelligence.bankAccounts.extend(re.findall(account_pattern, all_text))
-
-        # UPI IDs (email-like patterns filtered by known UPI providers)
-        upi_pattern = r"\b[\w\.-]+@[\w\.-]+\b"
-        upi_matches = re.findall(upi_pattern, all_text)
-
-        valid_upi_providers = (
-            "paytm",
-            "okaxis",
-            "ybl",
-            "axisbank",
-            "oksbi",
-            "sbi",
-            "upi",
+        # IFSC codes: 4 letters + 0 + 6 alphanumeric
+        intelligence.bankAccounts.extend(
+            re.findall(r"\b[a-z]{4}0[a-z0-9]{6}\b", all_text)
         )
 
+        # Bank account numbers preceded by context words
+        intelligence.bankAccounts.extend(
+            re.findall(
+                r"(?:account|a/c|acct|acc)\s*(?:no\.?|number|num|#)?\s*:?\s*(\d{9,18})",
+                all_text,
+            )
+        )
+
+        # UPI IDs filtered by known providers
+        upi_matches = re.findall(r"\b[\w\.-]+@[\w\.-]+\b", all_text)
         intelligence.upiIds.extend(
-            u for u in upi_matches if any(p in u for p in valid_upi_providers)
+            u for u in upi_matches
+            if any(p in u for p in cls.VALID_UPI_PROVIDERS)
         )
 
         # Phishing links
-        link_pattern = (
-            r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|"
-            r"[!*\\(\\),]|(?:%[0-9a-fA-F]{2}))+"
+        intelligence.phishingLinks.extend(
+            re.findall(
+                r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|"
+                r"[!*\\(\\),]|(?:%[0-9a-fA-F]{2}))+",
+                all_text,
+            )
         )
-        intelligence.phishingLinks.extend(re.findall(link_pattern, all_text))
 
-        # Phone numbers: require word boundary, 10-13 digits with optional +
-        phone_pattern = r"(?<!\d)\+?\d{10,13}(?!\d)"
-        intelligence.phoneNumbers.extend(re.findall(phone_pattern, all_text))
+        # Phone numbers: 10-13 digits with optional +, not part of a longer sequence
+        intelligence.phoneNumbers.extend(
+            re.findall(r"(?<!\d)\+?\d{10,13}(?!\d)", all_text)
+        )
 
-        # Suspicious keywords
-        suspicious_keywords = [
-            "urgent",
-            "verify",
-            "immediately",
-            "block",
-            "suspend",
-            "otp",
-            "cvv",
-            "pin",
-            "password",
-            "account number",
-        ]
-
-        for kw in suspicious_keywords:
+        for kw in cls.SUSPICIOUS_KEYWORDS:
             if kw in all_text:
                 intelligence.suspiciousKeywords.append(kw)
 
-        # Deduplicate everything
+        # Deduplicate
         intelligence.bankAccounts = list(set(intelligence.bankAccounts))
         intelligence.upiIds = list(set(intelligence.upiIds))
         intelligence.phishingLinks = list(set(intelligence.phishingLinks))

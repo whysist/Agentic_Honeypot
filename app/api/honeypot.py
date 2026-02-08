@@ -12,7 +12,6 @@ from app.core.intelligence import IntelligenceExtractor
 from app.services.callback import send_final_result
 
 logger = logging.getLogger(__name__)
-
 router = APIRouter()
 
 scam_detector = ScamDetector()
@@ -26,11 +25,8 @@ def honeypot_endpoint(
     _: None = Depends(verify_api_key),
 ):
     session = session_manager.get_or_create(payload.sessionId)
-
-    # ── Add incoming scammer message to server-side history
     session_manager.add_message(session, payload.message)
 
-    # ── Scam detection (every turn, until scam is confirmed)
     if not session.scamDetected:
         is_scam, categories, confidence = scam_detector.detect_scam(
             payload.message.text
@@ -41,7 +37,6 @@ def honeypot_endpoint(
                 session, is_scam, categories, confidence, persona=persona_key
             )
 
-    # ── Generate agent reply
     reply_text = conversation_agent.generate_response({
         "conversationHistory": [m.dict() for m in session.conversationHistory],
         "scamCategories": session.scamCategories,
@@ -53,32 +48,24 @@ def honeypot_endpoint(
         text=reply_text,
         timestamp=int(datetime.utcnow().timestamp() * 1000),
     )
-
     session_manager.add_message(session, reply_message)
 
-    # ── Intelligence extraction (every turn, uses server-side history)
     intelligence = intelligence_extractor.extract(session.conversationHistory)
     session.extractedIntelligence = intelligence
 
-    # ── Callback trigger conditions
     has_actionable_ioc = (
         intelligence.upiIds
         or intelligence.phishingLinks
         or intelligence.phoneNumbers
     )
-
     should_send = (
         not session.callbackSent
         and session.scamDetected
-        and (
-            has_actionable_ioc
-            or session.totalMessagesExchanged >= 8
-        )
+        and (has_actionable_ioc or session.totalMessagesExchanged >= 8)
     )
 
     if should_send:
-        success = send_final_result(session, intelligence)
-        if success:
+        if send_final_result(session, intelligence):
             session.callbackSent = True
 
     return HoneypotResponse(
