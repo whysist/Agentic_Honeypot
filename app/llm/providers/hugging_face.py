@@ -1,24 +1,12 @@
-import requests
 import logging
-from typing import Optional
+import requests
 
-from app.config import (
-    HUGGINGFACE_API_KEY,
-    HF_MODEL,
-)
+from app.config import HUGGINGFACE_API_KEY, HF_MODEL
 
 logger = logging.getLogger(__name__)
 
 HF_API_URL = f"https://router.huggingface.co/models/{HF_MODEL}"
-
-DEFAULT_TIMEOUT = 8  # seconds
-
-
-def _headers() -> dict:
-    return {
-        "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
-        "Content-Type": "application/json",
-    }
+DEFAULT_TIMEOUT = 8
 
 
 def generate_text(
@@ -28,12 +16,8 @@ def generate_text(
     top_p: float = 0.9,
     max_new_tokens: int = 120,
 ) -> str:
-    """
-    Send prompt to Hugging Face Inference API and return generated text.
-
-    Raises:
-        RuntimeError on hard failures
-    """
+    if not HUGGINGFACE_API_KEY:
+        raise RuntimeError("HUGGINGFACE_API_KEY not configured")
 
     payload = {
         "inputs": prompt,
@@ -48,38 +32,30 @@ def generate_text(
     try:
         response = requests.post(
             HF_API_URL,
-            headers=_headers(),
+            headers={
+                "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
+                "Content-Type": "application/json",
+            },
             json=payload,
             timeout=DEFAULT_TIMEOUT,
         )
-
     except requests.exceptions.Timeout:
-        logger.error("HuggingFace request timed out")
-        raise RuntimeError("LLM timeout")
-
+        raise RuntimeError("HuggingFace timeout")
     except requests.exceptions.RequestException as e:
-        logger.error(f"HuggingFace request failed: {e}")
-        raise RuntimeError("LLM request failed")
+        raise RuntimeError(f"HuggingFace request failed: {e}")
 
     if response.status_code != 200:
-        logger.error(
-            f"HuggingFace error {response.status_code}: {response.text}"
-        )
-        raise RuntimeError("LLM returned non-200 response")
+        logger.error("HuggingFace %s: %s", response.status_code, response.text)
+        raise RuntimeError("HuggingFace returned non-200")
 
     try:
         result = response.json()
     except ValueError:
-        logger.error("Invalid JSON from HuggingFace")
-        raise RuntimeError("Invalid LLM response")
+        raise RuntimeError("Invalid JSON from HuggingFace")
 
-    # HF usually returns a list of dicts
     if isinstance(result, list) and len(result) > 0:
         return result[0].get("generated_text", "").strip()
-
-    # Fallback shape (rare but defensive)
     if isinstance(result, dict):
         return result.get("generated_text", "").strip()
 
-    logger.error(f"Unexpected HuggingFace response format: {result}")
-    raise RuntimeError("Unexpected LLM response format")
+    raise RuntimeError(f"Unexpected HuggingFace response format: {result}")
