@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HoneyPot Demo</title>
+</head>
+<body>
+
+<h2>Agentic HoneyPot Demo</h2>
+
+<input id="message" placeholder="Enter scam message" size="60">
+<button onclick="send()">Send</button>
+
+<pre id="output"></pre>
+
+<script>
+async function send() {
+    const text = document.getElementById("message").value;
+
+    const res = await fetch("/honeypot", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "x-api-key": "demo_key"
+        },
+        body: JSON.stringify({
+            sessionId: "demo123",
+            message: {
+                sender: "scammer",
+                text: text,
+                timestamp: Date.now()
+            }
+        })
+    });
+
+    const data = await res.json();
+    document.getElementById("output").innerText =
+        JSON.stringify(data, null, 2);
+}
+</script>
+
+</body>
+</html>
