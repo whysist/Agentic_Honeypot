@@ -1,4 +1,5 @@
 venv/
 __pycache__/
 *.pyc
-.env
+app/.env
+app/utils/CheckMistral/
