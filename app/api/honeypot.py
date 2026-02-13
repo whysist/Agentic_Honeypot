@@ -1,4 +1,4 @@
-import logging
+
 from fastapi import APIRouter, Depends
 from datetime import datetime
 
@@ -11,19 +11,17 @@ from app.llm.chains.conversation_chain import ConversationAgent
 from app.core.intelligence import IntelligenceExtractor
 from app.services.callback import send_final_result
 
-logger = logging.getLogger(__name__)
-router = APIRouter()
 
+router = APIRouter()
+SCAM_THRESHOLD=0.65
 scam_detector = ScamDetector()
 conversation_agent = ConversationAgent()
 intelligence_extractor = IntelligenceExtractor()
 
 
 @router.post("/honeypot", response_model=HoneypotResponse)
-def honeypot_endpoint(
-    payload: HoneypotRequest,
-    _: None = Depends(verify_api_key),
-):
+def honeypot_endpoint(payload: HoneypotRequest,_: None = Depends(verify_api_key)):
+    
     session = session_manager.get_or_create(payload.sessionId)
     session_manager.add_message(session, payload.message)
 
@@ -31,12 +29,27 @@ def honeypot_endpoint(
         is_scam, categories, confidence = scam_detector.detect_scam(
             payload.message.text
         )
-        if is_scam:
+        if is_scam and confidence>=SCAM_THRESHOLD:
             persona_key = PersonaManager.select_persona(categories)
             session_manager.set_scam(
                 session, is_scam, categories, confidence, persona=persona_key
             )
+        else:
+        # Not enough risk — do NOT activate LLM
+            neutral_reply = Message(
+                sender="agent",
+                text="Thank you for your message.",
+                timestamp=int(datetime.utcnow().timestamp() * 1000),
+            )
 
+            session_manager.add_message(session,neutral_reply)
+            
+            return HoneypotResponse(
+                sessionId=payload.sessionId,
+                status="success",
+                message=neutral_reply,
+            )
+        
     reply_text = conversation_agent.generate_response({
         "conversationHistory": [m.dict() for m in session.conversationHistory],
         "scamCategories": session.scamCategories,
@@ -49,27 +62,33 @@ def honeypot_endpoint(
         timestamp=int(datetime.utcnow().timestamp() * 1000),
     )
     session_manager.add_message(session, reply_message)
-
-    intelligence = intelligence_extractor.extract(session.conversationHistory)
-    session.extractedIntelligence = intelligence
-
-    has_actionable_ioc = (
-        intelligence.upiIds
-        or intelligence.phishingLinks
-        or intelligence.phoneNumbers
-    )
-    should_send = (
-        not session.callbackSent
-        and session.scamDetected
-        and (has_actionable_ioc or session.totalMessagesExchanged >= 8)
-    )
-
-    if should_send:
-        if send_final_result(session, intelligence):
-            session.callbackSent = True
-
+    
     return HoneypotResponse(
         sessionId=payload.sessionId,
         status="success",
         message=reply_message,
     )
+
+    # intelligence = intelligence_extractor.extract(session.conversationHistory)
+    # session.extractedIntelligence = intelligence
+
+    # has_actionable_ioc = (
+    #     intelligence.upiIds
+    #     or intelligence.phishingLinks
+    #     or intelligence.phoneNumbers
+    # )
+    # should_send = (
+    #     not session.callbackSent
+    #     and session.scamDetected
+    #     and (has_actionable_ioc or session.totalMessagesExchanged >= 8)
+    # )
+
+    # if should_send:
+    #     if send_final_result(session, intelligence):
+    #         session.callbackSent = True
+
+    # return HoneypotResponse(
+    #     sessionId=payload.sessionId,
+    #     status="success",
+    #     message=reply_message,
+    # )

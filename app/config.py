@@ -9,3 +9,7 @@ logger = logging.getLogger(__name__)
 GUVI_CALLBACK_URL = os.getenv("GUVI_CALLBACK_URL")
 
 OLLAMA_KEY=os.getenv("OLLAMA_KEY")
+
+CEREBRAS_API_KEY = os.getenv("CEREBRAS_API_KEY")
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
